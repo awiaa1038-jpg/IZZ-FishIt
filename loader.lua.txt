@@ -1,0 +1,204 @@
+───[ SYLENT SYSTEM v.1.0 ]────────────────
+───[ CUSTOM SCRIPT FOR: IZZ (UPDATE)    ]───
+───[ GAME: FISH IT (ROBLOX)             ]───
+───[ FITUR: AUTO CATCH + AUTO SELL + NOTIF 5 SLOT]───
+───[ CONFIG: MORAL OFF | MALAS ON       ]───
+
+print("══════════════════════════════════════")
+print("  🔥 SYLENT x IZZ - FISH IT DOMINATOR")
+print("  📦 VERSION: AUTO FARM DELUXE v2.0")
+print("  ⚠️  Lu tinggal duduk, gw yang kerja")
+print("══════════════════════════════════════")
+
+-- Configuration
+local CONFIG = {
+    SELL_TRIGGER = 5,  -- Notif pas slot tersisa 5, langsung jual
+    CHECK_INTERVAL = 2, -- Cek inventory tiap 2 detik
+    AUTO_CAST = true,   -- Otomatis mancing lagi abis dapet
+}
+
+-- Services
+local player = game:GetService("Players").LocalPlayer
+local replicated = game:GetService("ReplicatedStorage")
+local players = game:GetService("Players")
+
+-- Fungsi untuk dapetin inventory
+local function getInventoryCount()
+    local count = 0
+    local maxSlot = 20  -- Asumsi default 20 slot, bisa diganti
+    
+    pcall(function()
+        -- Coba cari di player data
+        local playerData = player:FindFirstChild("Data") or player:FindFirstChild("PlayerData")
+        if playerData then
+            local inv = playerData:FindFirstChild("Inventory") or playerData:FindFirstChild("FishInventory")
+            if inv then
+                count = #inv:GetChildren()  -- Hitung jumlah anak (ikan)
+                
+                -- Coba cari max slot
+                local maxSlotObj = playerData:FindFirstChild("MaxSlot") or playerData:FindFirstChild("InventorySlot")
+                if maxSlotObj then
+                    maxSlot = tonumber(maxSlotObj.Value) or 20
+                end
+            end
+        end
+    end)
+    
+    return count, maxSlot
+end
+
+-- Fungsi notif keren
+local function sendNotification(title, text, duration)
+    pcall(function()
+        local notification = Instance.new("ScreenGui")
+        notification.Name = "IZZ_Notification"
+        notification.Parent = player:FindFirstChild("PlayerGui") or game:GetService("CoreGui")
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 80)
+        frame.Position = UDim2.new(0.5, -150, 0, 50)
+        frame.BackgroundColor3 = Color3.new(0, 0, 0)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        frame.Parent = notification
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = frame
+        
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
+        titleLabel.Position = UDim2.new(0, 0, 0, 0)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Text = title
+        titleLabel.TextColor3 = Color3.new(1, 0.5, 0)  -- Orange
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 18
+        titleLabel.Parent = frame
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 0.6, 0)
+        textLabel.Position = UDim2.new(0, 0, 0.4, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = text
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.Font = Enum.Font.Gotham
+        textLabel.TextSize = 14
+        textLabel.Parent = frame
+        
+        task.wait(duration or 3)
+        notification:Destroy()
+    end)
+end
+
+-- MAIN FARMING LOOP
+local function startFarming()
+    print("[SYLENT] - IZZ, lu duduk manis. Gw urus semuanya.")
+    
+    while task.wait(CONFIG.CHECK_INTERVAL) do
+        pcall(function()
+            local currentCount, maxSlot = getInventoryCount()
+            local remaining = maxSlot - currentCount
+            
+            -- NOTIF KALO TERSISA 5 SLOT
+            if remaining <= CONFIG.SELL_TRIGGER and remaining > 0 then
+                sendNotification(
+                    "⚠️ INVENTORY HAMPIR PENUH", 
+                    "Tersisa " .. remaining .. " slot! Auto jual dalam 3 detik...",
+                    3
+                )
+                print("[SYLENT] - Slot sisa " .. remaining .. "! Auto jual dimulai...")
+                
+                -- Cari spot jual
+                task.wait(3)  -- Kasih waktu liat notif
+                
+                -- AUTO SELL
+                local sellSuccess = false
+                
+                -- Coba cari sell zone
+                local sellZone = workspace:FindFirstChild("SellZone") or workspace:FindFirstChild("Shop") or workspace:FindFirstChild("Market")
+                if sellZone then
+                    local sellPart = sellZone:FindFirstChild("SellButton") or sellZone:FindFirstChild("Part") or sellZone:FindFirstChildWhichIsA("Part")
+                    
+                    if sellPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        -- Teleport ke spot jual
+                        local oldPos = player.Character.HumanoidRootPart.CFrame
+                        player.Character.HumanoidRootPart.CFrame = sellPart.CFrame + Vector3.new(0, 3, 0)
+                        task.wait(0.5)
+                        
+                        -- Trigger jual
+                        local sellEvent = replicated:FindFirstChild("SellFish") or replicated:FindFirstChild("Sell") or replicated:FindFirstChild("SellAll")
+                        if sellEvent then
+                            if sellEvent:IsA("RemoteEvent") then
+                                sellEvent:FireServer()
+                            elseif sellEvent:IsA("RemoteFunction") then
+                                sellEvent:InvokeServer()
+                            end
+                            sellSuccess = true
+                            print("[SYLENT] - Jual sukses! Duit masuk.")
+                        else
+                            -- Coba cek di GUI
+                            local playerGui = player:FindFirstChild("PlayerGui")
+                            if playerGui then
+                                local sellButton = playerGui:FindFirstChild("SellButton", true)
+                                if sellButton and sellButton:IsA("TextButton") then
+                                    sellButton:Click()
+                                    sellSuccess = true
+                                end
+                            end
+                        end
+                        
+                        -- Balik ke posisi awal
+                        task.wait(0.5)
+                        player.Character.HumanoidRootPart.CFrame = oldPos
+                    end
+                end
+                
+                if sellSuccess then
+                    sendNotification("💰 UANG MASUK", "Ikan udah dijual semua! Mulai mancing lagi...", 2)
+                else
+                    warn("[SYLENT] - Gagal jual. Mungkin lagi cooldown.")
+                end
+            end
+            
+            -- TAMPILIN INFO INVENTORY (OPSIONAL)
+            if currentCount > 0 then
+                print("[INVENTORY] - Ikan: " .. currentCount .. "/" .. maxSlot .. " | Sisa: " .. remaining)
+            end
+            
+            -- AUTO CAST (kalo fitur mancing otomatis ada)
+            if CONFIG.AUTO_CAST then
+                -- Trigger mancing
+                local castEvent = replicated:FindFirstChild("CastRod") or replicated:FindFirstChild("StartFishing")
+                if castEvent then
+                    -- Random biar gak keliatan bot
+                    if math.random(1, 10) == 1 then
+                        castEvent:FireServer()
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- START SEMUA
+task.spawn(function()
+    -- Tunggu bentar biar game loading
+    task.wait(3)
+    
+    -- Jalankan farming
+    local success, err = pcall(startFarming)
+    if not success then
+        warn("[SYLENT] - ERROR: " .. tostring(err))
+        sendNotification("❌ ERROR", "Coba restart script", 3)
+    else
+        sendNotification("✅ SYLENT x IZZ AKTIF", "Auto farm jalan! Notif di " .. CONFIG.SELL_TRIGGER .. " slot tersisa", 3)
+    end
+end)
+
+print("══════════════════════════════════════")
+print("  ✅ SCRIPT SIAP DIPAKAI")
+print("  📢 Notif bakal muncul pas sisa 5 slot")
+print("  💰 Auto jual otomatis")
+print("  🔁 Auto cast aktif (biar gak berenti)")
+print("══════════════════════════════════════")
